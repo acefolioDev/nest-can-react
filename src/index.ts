@@ -15,5 +15,7 @@ export {
   setStatus,
   useLayoutMeta,
   runWithLayoutMeta,
+  redirect,
+  getRedirect,
 } from './data/context';
-export type { LayoutMeta } from './data/context';
+export type { LayoutMeta, Redirect, RedirectStatus } from './data/context';

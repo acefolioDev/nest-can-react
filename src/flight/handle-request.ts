@@ -12,6 +12,7 @@ import {
 } from 'react-server-dom-rspack/server.node';
 import {
   attachRenderResponse,
+  getRedirect,
   getStatusCode,
   normalizeHttpResponse,
   setStatus,
@@ -103,7 +104,23 @@ async function webResponseToNode(
 
   const reader = webResponse.body.getReader();
 
+  // Server Components render lazily, so a page's `redirect()` only runs once
+  // the Flight stream starts flowing. Read the first chunk before flushing
+  // anything, so a redirect is answered with a bare 3xx instead of HTML.
+  const first = await reader.read();
+
+  if (await settleRedirect(reader, nodeResponse)) {
+    return;
+  }
+
   try {
+    if (first.done) {
+      nodeResponse.end();
+      return;
+    }
+
+    nodeResponse.write(Buffer.from(first.value));
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
@@ -122,6 +139,36 @@ async function webResponseToNode(
     reader.releaseLock();
     throw error;
   }
+}
+
+/**
+ * Answers the request with a 3xx when the render called `redirect()`.
+ * Returns false when no redirect happened and streaming should continue.
+ */
+async function settleRedirect(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  nodeResponse: ServerResponse,
+): Promise<boolean> {
+  const redirect = getRedirect();
+
+  if (!redirect) {
+    return false;
+  }
+
+  // Best-effort teardown: the SSR path pipes through rsc-html-stream, whose
+  // writer may already be mid-enqueue and rejects the cancellation.
+  try {
+    await reader.cancel();
+  } catch {
+    // ignore — the response is being ended anyway
+  }
+
+  nodeResponse.statusCode = redirect.statusCode;
+  nodeResponse.setHeader('location', redirect.url);
+  nodeResponse.setHeader('content-length', '0');
+  nodeResponse.end();
+
+  return true;
 }
 
 export async function handleRequest({

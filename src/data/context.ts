@@ -7,11 +7,23 @@ export type LayoutMeta = {
   [key: string]: unknown;
 };
 
+export type Redirect = {
+  url: string;
+  statusCode: RedirectStatus;
+};
+
+export type RedirectStatus = 301 | 302 | 303 | 307 | 308;
+
 type Store = {
   layoutMeta: LayoutMeta;
   statusCode?: number;
+  redirect?: Redirect;
   response?: ServerResponse;
 };
+
+const REDIRECT_STATUS_CODES: ReadonlySet<number> = new Set([
+  301, 302, 303, 307, 308,
+]);
 
 const storage = new AsyncLocalStorage<Store>();
 
@@ -60,6 +72,29 @@ export function setStatus(statusCode: number) {
 
 export function getStatusCode() {
   return storage.getStore()?.statusCode;
+}
+
+export function redirect(url: string, statusCode: RedirectStatus = 302) {
+  const store = storage.getStore();
+
+  if (!store) {
+    throw new Error(
+      'redirect() must run during render() (Server Component render).',
+    );
+  }
+
+  if (!REDIRECT_STATUS_CODES.has(statusCode)) {
+    throw new Error(
+      `redirect() status must be one of 301, 302, 303, 307, 308 (got ${statusCode}).`,
+    );
+  }
+
+  store.redirect = { url, statusCode };
+  store.statusCode = statusCode;
+}
+
+export function getRedirect() {
+  return storage.getStore()?.redirect;
 }
 
 export function attachRenderResponse(response: ServerResponse) {

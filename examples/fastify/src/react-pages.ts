@@ -7,5 +7,9 @@ import { createPageRef } from 'nest-can-react';
 export const NotePage = createPageRef("note");
 /** src/notes/notes.page.tsx */
 export const NotesPage = createPageRef("notes");
+/** src/redir/perm.page.tsx */
+export const PermPage = createPageRef("perm");
+/** src/redir/temp.page.tsx */
+export const TempPage = createPageRef("temp");
 /** src/welcome/welcome.page.tsx */
 export const WelcomePage = createPageRef("welcome");
